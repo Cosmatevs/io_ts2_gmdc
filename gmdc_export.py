@@ -1,5 +1,6 @@
 #-------------------------------------------------------------------------------
-# Copyright (C) 2021  DjAlex88 (https://github.com/djalex88/)
+# Original work: Copyright (C) 2021  DjAlex88 (https://github.com/djalex88/)
+# Modified work: Copyright (C) 2025  Cosmatevs (https://github.com/Cosmatevs/)
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -263,7 +264,7 @@ def export_geometry(scene, settings):
 				tri_uv = []
 				for loop_idx in tri.loops:
 					u1, v1 = uv_layer1.data[loop_idx].uv
-					u2, v2 = uv_layer1.data[loop_idx].uv
+					u2, v2 = uv_layer2.data[loop_idx].uv
 					tri_uv.append(((u1, 1-v1), (u2, 1-v2)))
 				mesh_tex_coords.append(tri_uv)
 
