@@ -1,6 +1,6 @@
 #-------------------------------------------------------------------------------
 # Original work: Copyright (C) 2021  DjAlex88 (https://github.com/djalex88/)
-# Modified work: Copyright (C) 2024  Cosmatevs (https://github.com/Cosmatevs/)
+# Modified work: Copyright (C) 2026  Cosmatevs (https://github.com/Cosmatevs/)
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
