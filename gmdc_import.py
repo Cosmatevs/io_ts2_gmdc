@@ -306,7 +306,10 @@ def import_geometry(scene, geometry, settings):
 
 					log( '\x20\x20--Key "%s"' % name )
 
-					block_verts = obj.shape_key_add(name=name).data
+					shape_key = obj.shape_key_add(name=name, from_mix=False)
+					shape_key.value = 1.0
+					shape_key.mute = True
+					block_verts = shape_key.data
 
 					# modify mesh with dV
 					#
