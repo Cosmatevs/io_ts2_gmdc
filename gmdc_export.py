@@ -607,7 +607,7 @@ def export_geometry(scene, settings):
 				v.extend(w)
 			if morphing > 1:
 				dN = [*map(list, zip(*dN)), [], [], []]
-				for v, w in zip(group.dNorms, dV):
+				for v, w in zip(group.dNorms, dN):
 					v.extend(w)
 
 		del V, N, T1, T2, B, W, X, K, dV, dN
