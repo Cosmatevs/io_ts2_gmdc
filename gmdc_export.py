@@ -271,7 +271,7 @@ def export_geometry(scene, settings):
 		# tangents
 		#
 		if settings['export_tangents']:
-			mesh.calc_tangents(uvmap=uv_layer1.name)
+			mesh.calc_tangents(uvmap=mesh.uv_layers[0].name)
 			mesh_tangents = []
 			for tri in mesh.loop_triangles:
 				tri_tan = []
@@ -427,7 +427,7 @@ def export_geometry(scene, settings):
 
 					if settings['export_tangents']:
 						# otherwise there will be problem with geometry indexing
-						mesh.calc_tangents(uvmap=uv_layer1.name)
+						mesh.calc_tangents(uvmap=mesh.uv_layers[0].name)
 
 				# add difference arrays
 				dv = [] ; dVerts.append(dv)

@@ -3,3 +3,6 @@
 
 # everything in target
 target/*
+
+# VS Code settings
+.vscode/*
