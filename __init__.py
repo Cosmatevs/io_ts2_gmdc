@@ -282,7 +282,8 @@ class Export_GMDC(bpy.types.Operator, ExportHelper):
 		box.prop(self, 'export_bmesh')
 		if self.export_bmesh:
 			box.prop(self, 'bmesh_name')
-			box.prop(self, 'bmesh_threshold')
+			if self.export_rigging:
+				box.prop(self, 'bmesh_threshold')
 		box = self.layout.box()
 		box.label(text="Other", icon='MODIFIER')
 		box.label(text="SGResource:")
