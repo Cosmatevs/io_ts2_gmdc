@@ -1,16 +1,19 @@
-## TS2 GMDC Importer/Exporter for Blender 2.80+
+# TS2 GMDC Importer/Exporter for Blender 2.80+
 
 This add-on supports rigging data, two UV layers, morphs, and bounding geometry.
 
-#### Installation
-1. Run Blender and change area to Preferences;
-2. Choose "Add-ons" and press "Install...";
-3. Install by selecting the io\_ts2\_gmdc.zip file;
-4. Finally, enable "Import-Export: TS2 GMDC Importer/Exporter". (For easier navigation you may filter the list of add-ons by selecting "Import-Export" from the drop down list.
+## Installation
+1. Download the **io\_ts2\_gmdc.zip** file from the **Releases** section.
+2. Run Blender and select **Preferences** from the **Edit** menu.
+3. Open the **Add-ons** section.
+4. Depending on the version of Blender, either press **Install...** in the top right or press the down arrow button and then select **Install from Disk...**.
+5. Install by selecting the downloaded **io\_ts2\_gmdc.zip** file.
+6. Enable **Import-Export: TS2 GMDC Importer/Exporter**.
+	For easier navigation, you may filter the list of add-ons by typing *Import-Export* in the search field.
 
 [![Screenshot](images/thumb_install.png "Installation")](images/install.png)
 
-#### Importing
+## Importing
 The importer works in two modes, Geometry and Skeleton.
 To view the options, press the top right toggle button in the file selection window (if not already shown).
 Geometry mode is used to import meshes from GMDC files, i.e., new mesh objects are added to the scene.
@@ -25,5 +28,5 @@ Key features:
 
 [![Screenshot](images/thumb_image3.png "Screenshot")](images/image3.png)
 
-#### Links:
+## Links
 * [Official Blender Website](https://www.blender.org/)
