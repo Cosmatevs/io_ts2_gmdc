@@ -1,6 +1,6 @@
 # TS2 GMDC Importer/Exporter for Blender 2.80+
 
-This add-on supports rigging data, two UV layers, morphs, and bounding geometry.
+This add-on supports rigging data, two UV layers, morphs, custom normals, and bounding geometry.
 
 ## Installation
 1. Download the **io\_ts2\_gmdc.zip** file from the **Releases** section.
@@ -22,7 +22,7 @@ In general, armature is not necessary for mesh editing, but may be helpful.
 
 Key features:
 * Bones are imported as vertex groups and initially named as "bone#{bone\_idx}", that is, bone index is written after the number sign. Although bone names can be changed, **do not delete or modify bone indices!** Otherwise, the exporter will most likely throw errors, since bone indices are extracted from vertex group names.
-* Morphs are imported as shape keys.
+* Morphs can be imported as either as shape keys (custom normals not preserved) or as separate objects (custom normals preserved; named as "object_name~~morph_group::morph_name").
 * Inverse transforms from GMDC files are saved in scene properties. This data is used by the exporter and included into generated GMDC file.
 * Seams can be removed by geometry reindexing (the "Remove doubles" option).
 

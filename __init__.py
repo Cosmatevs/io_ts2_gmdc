@@ -71,6 +71,23 @@ class Import_GMDC(bpy.types.Operator, ImportHelper):
 			name        = "Replace inverse transforms",
 			description = "If the scene already has inverse transforms set, they will be replaced",
 			default     = False )
+	
+	morph_mode : EnumProperty(
+			items = [
+				('SHAPE_KEYS', "Shape keys", "Import morphs as shape keys of objects."
+				"\nWARNING: Custom normals of morphs will be lost.",
+				'SHAPEKEY_DATA', 0),
+				('OBJECTS', "Objects", "Import morphs as separate objects."
+	 			"\nCustom normals of morphs will be applied."
+				"\nWARNING: If you modify an object in such a way"
+				" that its number of vertices changes (even temporarily),"
+				" you must either modify its morph objects in the same way, or recreate them entirely."
+				" Otherwise, you won't be able to export the morphs, or they will be corrupted.",
+				'OBJECT_DATA', 1),
+				],
+			default     = 'SHAPE_KEYS',
+			name        = "Morphs",
+			description = "Morph import mode" )
 
 	# skeleton (CRES file)
 	#
@@ -106,6 +123,7 @@ class Import_GMDC(bpy.types.Operator, ImportHelper):
 			 'remove_doubles' : self.remove_doubles,
 			   'import_bmesh' : self.import_bmesh,
 			  'replace_inv_t' : self.replace_inv_t,
+			     'morph_mode' : self.morph_mode,
 			  'selected_only' : self.selected_only,
 			      'all_bones' : self.all_bones,
 			       'save_log' : self.save_log,
@@ -119,6 +137,9 @@ class Import_GMDC(bpy.types.Operator, ImportHelper):
 			box.prop(self, 'remove_doubles')
 			box.prop(self, 'import_bmesh')
 			box.prop(self, 'replace_inv_t')
+			row = box.row(align=True)
+			row.prop(self, 'morph_mode')
+			row.label(icon='ERROR')
 		if self.import_mode == 'SKELETON':
 			box.prop(self, 'selected_only')
 			box.prop(self, 'all_bones')
@@ -160,12 +181,14 @@ class Export_GMDC(bpy.types.Operator, ExportHelper):
 	#
 	selected_only : BoolProperty(
 			name        = "Only selected objects",
-			description = "Export only selected objects",
+			description = "Export only selected objects."
+			"\nWARNING: Morph objects of selected objects and bounding geometry mesh will be exported even if they aren't selected.",
 			default     = False )
 
 	apply_transforms : BoolProperty(
 			name        = "Apply rotation & scale",
-			description = "Apply rotation and scaling to mesh objects",
+			description = "Apply rotation and scaling to mesh objects."
+			"\nWARNING: Objects hidden in viewport will not be affected.",
 			default     = True )
 
 	export_rigging : BoolProperty(
@@ -199,13 +222,13 @@ class Export_GMDC(bpy.types.Operator, ExportHelper):
 
 	export_morphs : EnumProperty(
 			items = [
-				('0', "Do not export morphs", "Ignore shape keys (if exist); no morph data created"),
+				('0', "Do not export morphs", "Ignore shape keys and morph objects (if exist); no morph data created"),
 				('1', "Diff. in v.coords only", "Use only vertex coordinates to calculate morph data"),
 				('2', "Diff. in v.coords and normals", "Calculate morph data from vertex coordinates and normals"),
 				],
 			default     = '0',
 			name        = "Morphs",
-			description = "Calculate morph data from shape keys" )
+			description = "Calculate morph data from shape keys and morph objects" )
 
 	align_normals : BoolProperty(
 			name        = "Align normals",

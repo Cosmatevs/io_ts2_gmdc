@@ -141,47 +141,80 @@ def export_geometry(scene, settings):
 
 	view_layer_objects = bpy.context.view_layer.objects
 
+	# object type checks
+	#
+	is_mesh_object = lambda x: x.type=='MESH'
+	is_morph_object = lambda x: '~~' in x.name
+
 	# get all mesh objects
 	#
+	unfiltered_mesh_objects = [x for x in view_layer_objects if is_mesh_object(x)]
 	if settings['selected_only']:
-		mesh_object_filter = lambda obj: obj.type=='MESH' and obj.select_get()
+		mesh_objects = [x for x in unfiltered_mesh_objects if x.select_get() and not is_morph_object(x)]
 	else:
-		mesh_object_filter = lambda obj: obj.type=='MESH'
+		mesh_objects = [x for x in unfiltered_mesh_objects if not is_morph_object(x)]
 
-	mesh_objects = list(filter(mesh_object_filter, view_layer_objects))
+	# bounding mesh object
+	#
+	if settings['export_bmesh']:
+		bmesh_object = view_layer_objects.get(settings['bmesh_name'])
+		if not bmesh_object or not is_mesh_object(bmesh_object):
+			error( 'Error! Could not find bounding mesh "%s".' % settings['bmesh_name'] )
+			return False
+		# remove from objects
+		try:
+			mesh_objects.remove(bmesh_object)
+		except ValueError:
+			pass # not found in mesh_objects
+
+	# check that object list is not empty
+	if not mesh_objects:
+		error( 'Error! Object list is empty.' )
+		return False
+
+	# morph objects
+	#
+	if settings['export_morphs']:
+		morph_objects = [x for x in unfiltered_mesh_objects if is_morph_object(x)]
+		morph_objects_of_mesh_objects = {}
+		for morph_obj in morph_objects:
+			obj_name = morph_obj.name.strip().split('~~')[0]
+			mesh_obj = next((x for x in mesh_objects if x.name == obj_name), None)
+			
+			if not mesh_obj:
+				if morph_obj in mesh_objects:
+					log( 'Warning! Could not find object "%s" referred by morph object "%s".' % (obj_name, morph_obj.name) )
+				continue
+			
+			try:
+				morph_objects_of_mesh_objects[mesh_obj.name].append(morph_obj)
+			except KeyError:
+				morph_objects_of_mesh_objects[mesh_obj.name] = [morph_obj]
+
+	# list meshes whose geometry will be used in any way
+	#
+	mesh_objects_incl_special = mesh_objects.copy()
+	if settings['export_bmesh']:
+		mesh_objects_incl_special.append(bmesh_object)
+	if settings['export_morphs']:
+		mesh_objects_incl_special += [x for sublist in morph_objects_of_mesh_objects.values() for x in sublist]
 
 	# apply transforms if needed
 	#
 	if settings['apply_transforms']:
-		for obj in mesh_objects:
+		for obj in mesh_objects_incl_special:
 			obj.select_set(True)
 		if bpy.ops.object.transform_apply.poll():
 			bpy.ops.object.transform_apply(rotation=True, scale=True, location=False, properties=False)
 
 	# check whether visual transforms applied
 	#
-	objects = [obj for obj in mesh_objects if tuple(obj.rotation_euler)!=(0, 0, 0) or tuple(obj.scale)!=(1, 1, 1)]
+	objects = [obj for obj in mesh_objects_incl_special if tuple(obj.rotation_euler)!=(0, 0, 0) or tuple(obj.scale)!=(1, 1, 1)]
 	if objects:
 		error( 'Error! The following mesh ' + ('objects have' if len(objects)>1 else 'object has') + ' non-applied visual transforms:' )
 		for obj in objects:
 			error( '\x20\x20%s -> rot: %s, size: %s' % (str(obj), str(obj.rotation_euler), str(obj.scale)) )
 		error( 'Solution: apply visual transforms (Ctrl+A).' )
-		return False
-
-	# bounding mesh object
-	#
-	if settings['export_bmesh']:
-		bmesh_object = view_layer_objects.get(settings['bmesh_name'])
-		if not bmesh_object or bmesh_object.type != 'MESH':
-			error( 'Error! Could not find bounding mesh.' )
-			return False
-		# remove from objects
-		if mesh_objects.count(bmesh_object):
-			mesh_objects.remove(bmesh_object)
-
-	# check that object list is not empty
-	if not mesh_objects:
-		error( 'Error! Object list is empty.' )
 		return False
 
 	# inverse transforms
@@ -230,7 +263,7 @@ def export_geometry(scene, settings):
 
 		# mesh normals (possibly custom normals)
 		#
-		if bpy.app.version < (4, 1, 0):
+		if hasattr(mesh, 'calc_normals_split'):
 			# in blender 4.1+ this function has been removed and normals are always calculated
 			mesh.calc_normals_split()
 		mesh_normals = []
@@ -366,17 +399,17 @@ def export_geometry(scene, settings):
 		# morphs / vertex animations
 		#
 
-		if settings['export_morphs'] and mesh.shape_keys and len(mesh.shape_keys.key_blocks) > 1:
+		morphing = settings['export_morphs']
+		if morphing:
 			# 0 - None
 			# 1 - diff in verts
 			# 2 - diff in verts and norms
-			morphing = settings['export_morphs']
-		else:
-			morphing = False
+			has_shape_keys = mesh.shape_keys and len(mesh.shape_keys.key_blocks) > 1
+			has_morph_objects = morph_objects_of_mesh_objects.get(obj.name)
+			if not has_shape_keys and not has_morph_objects:
+				morphing = 0
 
 		if morphing:
-
-			log( '--Processing shape keys...' )
 
 			mesh_morphs = [] # morph indices of current mesh object
 			first_new_morph_index = None # first new morph that is not present in MORPH_NAMES
@@ -386,72 +419,110 @@ def export_geometry(scene, settings):
 
 			# compute differences
 
-			for key_idx, key_block in enumerate(mesh.shape_keys.key_blocks[1:], 1): # skip Basis key
+			for morph_type in ['morph object', 'shape key']:
+				
+				if morph_type == 'morph object':
+					if not has_morph_objects:
+						continue
+					morph_list = morph_objects_of_mesh_objects.get(obj.name, [])
+				elif morph_type == 'shape key':
+					if not has_shape_keys:
+						continue
+					morph_list = mesh.shape_keys.key_blocks[1:] # skip Basis key
+				
+				log( '--Processing %ss...' % morph_type )
 
-				name = tuple(key_block.name.strip().split('::'))
-				if len(name) != 2:
-					error( 'Error! Invalid morph name: "%s"' % '::'.join(name) )
-					return False
+				for morph_idx, morph_block in enumerate(morph_list, 1):
 
-				if name in MORPH_NAMES:
-					j = MORPH_NAMES.index(name)
-				else:
-					# new morph
-					j = len(MORPH_NAMES)
-					MORPH_NAMES.append(name)
-					if first_new_morph_index == None:
-						first_new_morph_index = j
-				mesh_morphs.append(j)
-
-				log( '\x20\x20--Key "%s" (%i)' % (name, key_idx) )
-
-				# activate morph
-				obj.active_shape_key_index = key_idx
-				assert bpy.ops.object.editmode_toggle.poll()
-				for i in range(2): bpy.ops.object.editmode_toggle()
-
-				mesh.calc_loop_triangles()
-
-				if morphing == 2:
-					# calc normals for this shape
-					if bpy.app.version < (4, 1, 0):
-						# in blender 4.1+ this function has been removed and normals are always calculated
-						mesh.calc_normals_split()
+					raw_name = morph_block.name.strip()
+					if morph_type == 'morph object':
+						raw_name = raw_name.partition('~~')[2]
+					name = tuple(raw_name.split('::'))
+					if len(name) != 2:
+						error( 'Error! Invalid morph name: "%s"' % raw_name )
+						return False
 					
-					mesh_normals = []
-					for tri in mesh.loop_triangles:
-						tri_norm = []
-						for loop_idx in tri.loops:
-							tri_norm.append(tuple(mesh.loops[loop_idx].normal))
-						mesh_normals.append(tri_norm)
+					log( '\x20\x20--Morph "%s" (%i)' % (name, morph_idx) )
 
-					if settings['export_tangents']:
-						# otherwise there will be problem with geometry indexing
-						mesh.calc_tangents(uvmap=mesh.uv_layers[0].name)
+					if name in MORPH_NAMES:
+						j = MORPH_NAMES.index(name)
+					else:
+						# new morph
+						j = len(MORPH_NAMES)
+						MORPH_NAMES.append(name)
+						if first_new_morph_index == None:
+							first_new_morph_index = j
+					
+					if (j in mesh_morphs):
+						error( 'Error! Mesh cannot have multiple morphs with the same name: "%s"' % raw_name )
+						return False
+					
+					mesh_morphs.append(j)
 
-				# add difference arrays
-				dv = [] ; dVerts.append(dv)
-				dn = [] ; dNorms.append(dn)
+					if morph_type == 'morph object':
+						morph_mesh = morph_block.data
+						morph_obj_loc = morph_block.location
+						morph_vertices = morph_block.data.vertices
+						if len(morph_mesh.vertices) != len(mesh.vertices):
+							error( 'Error! Number of vertices in object "%s" and morph object "%s" must be the same.' % (obj.name, morph_block.name) )
+							return False
+					
+					elif morph_type == 'shape key':
+						morph_mesh = mesh
+						morph_obj_loc = obj_loc
+						morph_vertices = morph_block.data
 
-				# loop through all triangles and compute vertex differences
-				j = 0
-				if morphing == 2:
-					for tri, tri_norm in zip(mesh.loop_triangles, mesh_normals):
-						verts = [(key_block.data[idx].co + obj_loc) for idx in tri.vertices]
-						norms = map(BlenderVector, tri_norm)
-						for co, no in zip(verts, norms):
-							dv.append(tuple(co - BlenderVector(all_vertices[j][0])))
-							dn.append(tuple(no - BlenderVector(all_vertices[j][1])))
-							j+= 1
-				else:
-					for tri in mesh.loop_triangles:
-						verts = [(key_block.data[idx].co + obj_loc) for idx in tri.vertices]
-						for co in verts:
-							dv.append(tuple(co - BlenderVector(all_vertices[j][0])))
-							j+= 1
-				assert j == len(all_vertices)
+					morph_mesh.calc_loop_triangles()
 
-			log( '\x20\x20--Packing...' )
+					# calculate normals
+					if morphing == 2:
+						morph_normals = []
+
+						if morph_type == 'morph object':
+
+							if hasattr(morph_mesh, 'calc_normals_split'):
+								# in blender 4.1+ split normals are calculated by default and this function doesn't exist
+								morph_mesh.calc_normals_split()
+							
+							for tri in morph_mesh.loop_triangles:
+								tri_norm = []
+								for loop_idx in tri.loops:
+									tri_norm.append(tuple(morph_mesh.loops[loop_idx].normal))
+								morph_normals.append(tri_norm)
+						
+						elif morph_type == 'shape key':
+							shape_key_normals = morph_block.normals_split_get()
+							for i in range(0, len(shape_key_normals), 9):
+								tri_norm = [
+									tuple(shape_key_normals[i:i+3]),
+									tuple(shape_key_normals[i+3:i+6]),
+									tuple(shape_key_normals[i+6:i+9])
+								]
+								morph_normals.append(tri_norm)
+
+					# add difference arrays
+					dv = [] ; dVerts.append(dv)
+					dn = [] ; dNorms.append(dn)
+
+					# loop through all triangles and compute vertex differences
+					j = 0
+					if morphing == 2:
+						for tri, tri_norm in zip(morph_mesh.loop_triangles, morph_normals):
+							verts = [(morph_vertices[idx].co + morph_obj_loc) for idx in tri.vertices]
+							norms = map(BlenderVector, tri_norm)
+							for co, no in zip(verts, norms):
+								dv.append(tuple(co - BlenderVector(all_vertices[j][0])))
+								dn.append(tuple(no - BlenderVector(all_vertices[j][1])))
+								j+= 1
+					else:
+						for tri in morph_mesh.loop_triangles:
+							verts = [(morph_vertices[idx].co + morph_obj_loc) for idx in tri.vertices]
+							for co in verts:
+								dv.append(tuple(co - BlenderVector(all_vertices[j][0])))
+								j+= 1
+					assert j == len(all_vertices)
+
+			log( '--Packing morphs...' )
 
 			keys = [[] for i in range(len(all_vertices))]
 
@@ -485,7 +556,7 @@ def export_geometry(scene, settings):
 					for co, key, pdv in zip(dv, keys, packed_dv):
 						if co != (0.0, 0.0, 0.0):
 							if len(key) == 4:
-								error( 'Error! Some vertices are affected by more than 4 morphs (shape keys).' )
+								error( 'Error! Some vertices are affected by more than 4 morphs (shape keys or morph objects).' )
 								return False
 							# morph index
 							key.append(i)
@@ -675,11 +746,6 @@ def export_geometry(scene, settings):
 	static_bmesh = None ; dynamic_bmesh = None
 
 	if settings['export_bmesh']:
-
-		bmesh_object = view_layer_objects.get(settings['bmesh_name'])
-		if not bmesh_object:
-			error( 'Error! Could not find bounding mesh object with name "%s".' % settings['bmesh_name'] )
-			return False
 
 		mesh = bmesh_object.data
 

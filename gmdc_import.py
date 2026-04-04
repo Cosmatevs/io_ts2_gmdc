@@ -153,8 +153,8 @@ def import_geometry(scene, geometry, settings):
 		#
 		if N:
 			normals = [BlenderVector(no).normalized() for no in N]
-			if bpy.app.version < (4, 1, 0):
-				# in blender 4.1 this property has been removed
+			if hasattr(mesh, 'use_auto_smooth'):
+				# in blender 4.1+ this property has been removed and is no longer needed
 				mesh.use_auto_smooth = True
 			mesh.normals_split_custom_set_from_vertices(normals)
 
@@ -283,19 +283,25 @@ def import_geometry(scene, geometry, settings):
 						w = weights[j]
 					obj.vertex_groups[bone_idx].add([i], w, 'REPLACE')
 
-		# shape keys
+		# morphs
 		#
 		if data_group.keys:
-
-			log( '--Adding shape keys...' )
+			
+			if settings['morph_mode'] == 'OBJECTS':
+				log( '--Adding morphs as objects...' )
+			elif settings['morph_mode'] == 'SHAPE_KEYS':
+				log( '--Adding shape keys...' )
 
 			keys = select_data(data_group.keys)
-			dV = list(map(select_data, data_group.dVerts))
 
+			dV = list(map(select_data, data_group.dVerts))
 			log( '\x20\x20--Length of dV: (%i, %i, %i, %i)' % tuple(map(len, dV)) )
 
-			# basis
-			obj.shape_key_add(name="Basis")
+			if settings['morph_mode'] == 'OBJECTS':
+				dN = list(map(select_data, data_group.dNorms))
+				log( '\x20\x20--Length of dN: (%i, %i, %i, %i)' % tuple(map(len, dV)) )
+			elif settings['morph_mode'] == 'SHAPE_KEYS':
+				obj.shape_key_add(name="Basis")			
 
 			for morph_idx, name in enumerate(geometry.morph_names):
 
@@ -306,18 +312,41 @@ def import_geometry(scene, geometry, settings):
 
 					log( '\x20\x20--Key "%s"' % name )
 
-					shape_key = obj.shape_key_add(name=name, from_mix=False)
-					shape_key.value = 1.0
-					shape_key.mute = True
-					block_verts = shape_key.data
+					if settings['morph_mode'] == 'OBJECTS':
+						morph_obj = obj.copy()
+						morph_obj.data = obj.data.copy()
+						morph_obj.name = obj.name + '~~' + name
+						morph_obj.data.name = morph_obj.name
 
-					# modify mesh with dV
+						active_collection_objects.link(morph_obj)
+						morph_obj.hide_set(True)
+						morph_obj.hide_render = True
+
+						block_verts = morph_obj.data.vertices
+						morph_obj_normals = N.copy()
+
+					elif settings['morph_mode'] == 'SHAPE_KEYS':
+						shape_key = obj.shape_key_add(name=name, from_mix=False)
+						shape_key.value = 1.0
+						shape_key.mute = True
+
+						block_verts = shape_key.data
+
+					# modify mesh with dV and dN
 					#
 					for i, key in used_keys:
 						j = key.index(morph_idx)
 						v = dV[j]
 						if v:
-							block_verts[i].co+= BlenderVector(v[i])
+							block_verts[i].co += BlenderVector(v[i])
+						if settings['morph_mode'] == 'OBJECTS':
+							n = dN[j]
+							if n:
+								morph_obj_normals[i] = tuple(map(sum, zip(morph_obj_normals[i], n[i])))
+
+					if settings['morph_mode'] == 'OBJECTS':
+						normals = [BlenderVector(no).normalized() for no in morph_obj_normals]
+						morph_obj.data.normals_split_custom_set_from_vertices(normals)
 
 					del used_keys
 
