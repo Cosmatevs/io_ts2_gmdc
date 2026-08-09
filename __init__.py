@@ -185,6 +185,11 @@ class Export_GMDC(bpy.types.Operator, ExportHelper):
 			"\nWARNING: Morph objects of selected objects and bounding geometry mesh will be exported even if they aren't selected.",
 			default     = False )
 
+	no_export_string : StringProperty(
+			name        = "Skip tag",
+			description = "Objects, vertex groups (bones), and key shapes (morphs) whose names contain this string will not be exported. It's case-sensitive.",
+			default     = "[noexport]" )
+
 	apply_transforms : BoolProperty(
 			name        = "Apply rotation & scale",
 			description = "Apply rotation and scaling to mesh objects."
@@ -241,13 +246,13 @@ class Export_GMDC(bpy.types.Operator, ExportHelper):
 			name        = "Target",
 			description = "Reference mesh to align normals to" )
 
+	# other
+	#
 	resource_name : StringProperty(
 			name        = "SGResource",
 			description = "SGResource name of this geometry",
 			default     = "" )
 
-	# other
-	#
 	name_suffix : BoolProperty(
 			name        = "_tslocator_gmdc",
 			description = "Add default suffix",
@@ -284,6 +289,7 @@ class Export_GMDC(bpy.types.Operator, ExportHelper):
 			   'export_morphs' : int(self.export_morphs),
 			   'align_normals' : self.align_normals,
 			    'align_target' : self.align_target,
+			'no_export_string' : self.no_export_string.lower(),
 			   'resource_name' : self.resource_name.strip(),
 			     'name_suffix' : self.name_suffix,
 			   'use_obj_props' : self.use_obj_props,
@@ -295,6 +301,7 @@ class Export_GMDC(bpy.types.Operator, ExportHelper):
 		box = self.layout.box()
 		box.label(text="Geometry", icon='MESH_DATA')
 		box.prop(self, 'selected_only')
+		box.prop(self, 'no_export_string')
 		box.prop(self, 'apply_transforms')
 		box.prop(self, 'export_rigging')
 		box.prop(self, 'export_tangents')

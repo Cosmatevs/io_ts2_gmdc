@@ -84,15 +84,16 @@ def begin_export(filename, scene, settings):
 	log( 'File:', filename )
 	log( 'Settings:' )
 	log( '--Only selected objects:', settings['selected_only'] )
+	log( '--Skip tag: ', settings['no_export_string'] )
 	log( '--Apply transforms:', settings['apply_transforms'] )
-	log( '--Export rigging:  ', settings['export_rigging'] )
+	log( '--Export rigging: ', settings['export_rigging'] )
 	log( '--Export tangents: ', settings['export_tangents'] )
 	log( '--Export bounding geometry:', settings['export_bmesh'] )
 	log( '--Bounding mesh name:', settings['bmesh_name'] and '"%s"' % settings['bmesh_name'] or 'none' )
 	log( '--Weight threshold:', settings['bmesh_threshold'] )
 	log( '--Export morphs:', settings['export_morphs'] )
 	log( '--Resource name:', settings['resource_name'] and '"%s"' % settings['resource_name'] or 'none' )
-	log( '--Name suffix:  ', settings['name_suffix'] )
+	log( '--Name suffix: ', settings['name_suffix'] )
 	log( '--Use properties: ', settings['use_obj_props'] )
 	log()
 
@@ -145,10 +146,11 @@ def export_geometry(scene, settings):
 	#
 	is_mesh_object = lambda x: x.type=='MESH'
 	is_morph_object = lambda x: '~~' in x.name
+	has_no_export_name = lambda x: settings['no_export_string'] in x.name
 
 	# get all mesh objects
 	#
-	unfiltered_mesh_objects = [x for x in view_layer_objects if is_mesh_object(x)]
+	unfiltered_mesh_objects = [x for x in view_layer_objects if is_mesh_object(x) and not has_no_export_name(x)]
 	if settings['selected_only']:
 		mesh_objects = [x for x in unfiltered_mesh_objects if x.select_get() and not is_morph_object(x)]
 	else:
@@ -325,8 +327,12 @@ def export_geometry(scene, settings):
 			bone_indices = [] # [index] -> global_bone_indices
 
 			for group in obj.vertex_groups:
+				if has_no_export_name(group):
+					continue
+
 				# get bone index
-				s = group.name.split("#")
+				name = group.name
+				s = name.split("#")
 				try:
 					bone_idx = int(s[-1])
 					if len(s) < 2 or bone_idx < 0:
@@ -433,6 +439,8 @@ def export_geometry(scene, settings):
 				log( '--Processing %ss...' % morph_type )
 
 				for morph_idx, morph_block in enumerate(morph_list, 1):
+					if has_no_export_name(morph_block):
+						continue
 
 					raw_name = morph_block.name.strip()
 					if morph_type == 'morph object':
@@ -764,6 +772,9 @@ def export_geometry(scene, settings):
 			bone_vertex_groups = {} # { bone_idx -> group_idx }
 
 			for group in bmesh_object.vertex_groups:
+				if has_no_export_name(group):
+					continue
+
 				# get bone index
 				name = group.name
 				s = name.split("#")
