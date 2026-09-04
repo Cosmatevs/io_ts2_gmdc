@@ -235,7 +235,7 @@ def _load_geometry_data(f, log_level):
 
 		# indices
 		#
-		if s1 in ('0x7C4DEE82', '0x5C4AFC5C', '0x1C4AFC56') and 'V' in locals() and V != None:
+		if i and s1 in ('0x7C4DEE82', '0x5C4AFC5C', '0x1C4AFC56') and 'V' in locals() and V != None:
 
 			i = unpack('<l', f.read(4))[0]
 			s = f.read(i*2)
